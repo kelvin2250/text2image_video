@@ -8,13 +8,11 @@ from collections import defaultdict
 from transformers import CLIPTokenizer, CLIPModel
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 
-# ────────────────────────────────────────
-# Config paths
-DATA_DIR = Path("/kaggle/input/flickr30k-images/flickr30k_images")
-CAPTION_FILE = DATA_DIR.parent / "captions.txt"
 
+from config import DATA_DIR , CAPTION_FILE, OUTPUT_DIR
 # ────────────────────────────────────────
 # Load model + tokenizer
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
@@ -37,7 +35,7 @@ def load_caption_groups(caption_file):
         for line in f:
             try:
                 rel_path, caption = line.strip().split('\t')
-                rel_path = rel_path.replace("\\", "/")  # 👈 fix lỗi đường dẫn Windows-style
+                rel_path = rel_path.replace("\\", "/")  # fix lỗi đường dẫn Windows
                 abs_path = str(DATA_DIR / Path(rel_path).name)
                 image_to_captions[abs_path].append(caption)
             except ValueError:
@@ -71,7 +69,6 @@ def extract_features(image_to_captions, device, tokenizer, model, preprocess, ba
     for i in tqdm(range(0, len(all_image_paths), batch_size), desc="Extracting features"):
         batch_paths = all_image_paths[i:i + batch_size]
 
-        # Encode image
         try:
             imgs = [preprocess(Image.open(p).convert("RGB")) for p in batch_paths]
             imgs = torch.stack(imgs).to(device)
@@ -83,7 +80,6 @@ def extract_features(image_to_captions, device, tokenizer, model, preprocess, ba
             print(f"⚠️ Error encoding images {i}-{i+batch_size}: {e}")
             continue
 
-        # Encode captions
         captions, owners = [], []
         for path in batch_paths:
             for cap in image_to_captions.get(path, []):
@@ -107,16 +103,16 @@ def extract_features(image_to_captions, device, tokenizer, model, preprocess, ba
         text_to_image_map
     )
 
-def save_features(image_feats, text_feats, image_paths, text_to_image_map, output_dir="outputs"):
+def save_features(image_feats, text_feats, image_paths, text_to_image_map, output_dir=OUTPUT_DIR):
     os.makedirs(output_dir, exist_ok=True)
-    torch.save(image_feats, os.path.join(output_dir, "image_features.pt"))
-    torch.save(text_feats, os.path.join(output_dir, "text_features.pt"))
+    torch.save(image_feats, output_dir / "image_features.pt")
+    torch.save(text_feats, output_dir / "text_features.pt")
 
-    with open(os.path.join(output_dir, "image_paths.txt"), 'w', encoding='utf-8') as f:
+    with open(output_dir / "image_paths.txt", 'w', encoding='utf-8') as f:
         for p in image_paths:
             f.write(p + '\n')
 
-    with open(os.path.join(output_dir, "caption_map.json"), 'w', encoding='utf-8') as f:
+    with open(output_dir / "caption_map.json", 'w', encoding='utf-8') as f:
         json.dump(text_to_image_map, f, indent=2, ensure_ascii=False)
 
     print(f"✅ Saved features to {output_dir}/")

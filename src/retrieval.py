@@ -2,10 +2,17 @@ import os
 import faiss
 import torch
 import json
+from pathlib import Path
 from PIL import Image
 import matplotlib.pyplot as plt
 from transformers import CLIPProcessor, CLIPModel
-from config import IMG_DIR, CAPTION_FILE
+from config import DATA_DIR, OUTPUT_DIR
+
+# ────────────────────────────────────────
+# Paths (auto for local/Kaggle)
+OUTPUT_DIR = Path(OUTPUT_DIR)
+INDEX_PATH = OUTPUT_DIR / "image.index"
+IMAGE_LIST_PATH = OUTPUT_DIR / "image_paths.txt"
 
 # ────────────────────────────────────────
 # 1. Load CLIP model + processor
@@ -17,12 +24,13 @@ print(f"✅ Loaded CLIP model on {device}")
 
 # ────────────────────────────────────────
 # 2. Load FAISS index & image paths
-index_path = "outputs/image.index"
-path_file = "outputs/image_paths.txt"
+if not INDEX_PATH.exists():
+    raise FileNotFoundError(f"❌ FAISS index not found: {INDEX_PATH}")
+index = faiss.read_index(str(INDEX_PATH))
 
-index = faiss.read_index(index_path)
-
-with open(path_file, "r", encoding="utf-8") as f:
+if not IMAGE_LIST_PATH.exists():
+    raise FileNotFoundError(f"❌ Image paths file not found: {IMAGE_LIST_PATH}")
+with open(IMAGE_LIST_PATH, "r", encoding="utf-8") as f:
     image_paths = [line.strip() for line in f]
 
 print(f"📁 Loaded {len(image_paths)} image paths")
@@ -37,62 +45,53 @@ def encode_query(text):
     return text_feat.cpu().numpy().astype("float32")
 
 # ────────────────────────────────────────
-# 4. Search top-K image
-def search_image(query, top_k=5):
-    query_vector = encode_query(query)
-    D, I = index.search(query_vector, top_k)
+# 4. Search top-K images
+def search_images(query, top_k=5):
+    q_vec = encode_query(query)
+    D, I = index.search(q_vec, top_k)
     results = []
     for idx in I[0]:
         path = image_paths[idx]
-        if not os.path.exists(path):
+        if not Path(path).exists():
             print(f"⚠️ Warning: File not found: {path}")
             continue
         results.append(path)
     return results
 
 # ────────────────────────────────────────
-# 5. Show results
-def show_images(image_paths, query):
-    images = []
-    for path in image_paths:
+# 5. Display results
+def show_images(paths, query):
+    imgs = []
+    for p in paths:
         try:
-            img = Image.open(path).convert("RGB")
-            images.append(img)
+            imgs.append(Image.open(p))
         except Exception as e:
-            print(f"❌ Could not open image {path}: {e}")
-            continue
-
+            print(f"❌ Could not open {p}: {e}")
+    if not imgs:
+        print("❌ No images to display.")
+        return
     plt.figure(figsize=(15, 5))
-    for i, img in enumerate(images):
-        plt.subplot(1, len(images), i + 1)
+    for i, img in enumerate(imgs):
+        plt.subplot(1, len(imgs), i+1)
         plt.imshow(img)
-        plt.title(f"Top {i+1}")
-        plt.axis("off")
-
-    plt.suptitle(f"🔍 Query: {query}", fontsize=14)
-    plt.tight_layout()
+        plt.title(f"Rank {i+1}")
+        plt.axis('off')
+    plt.suptitle(f"🔍 Query: {query}")
     plt.show()
 
 # ────────────────────────────────────────
-# 6. CLI interface
+# 6. CLI loop
 if __name__ == "__main__":
     while True:
-        try:
-            query = input("\n📝 Enter your text query (or 'exit'): ")
-            if query.strip().lower() == "exit":
-                print("👋 Exiting.")
-                break
-
-            top_paths = search_image(query, top_k=5)
-
-            print("\n🔍 Top retrieved images:")
-            for path in top_paths:
-                print(f"📸 {path}")
-
-            show_images(top_paths, query)
-
-        except KeyboardInterrupt:
-            print("\n👋 Exiting by KeyboardInterrupt.")
+        query = input("\n📝 Enter query (or 'exit'): ")
+        if query.strip().lower() == 'exit':
+            print("👋 Goodbye.")
             break
+        try:
+            topk = search_images(query, top_k=5)
+            print("\n🔍 Top results:")
+            for p in topk:
+                print(f"📸 {p}")
+            show_images(topk, query)
         except Exception as e:
             print(f"❌ Error: {e}")
