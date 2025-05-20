@@ -1,12 +1,17 @@
 import os
 import json
 import torch
+from pathlib import Path
 from PIL import Image
 from tqdm import tqdm
 from collections import defaultdict
 from transformers import CLIPTokenizer, CLIPModel
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-from config import DATA_DIR, CAPTION_FILE
+
+# ────────────────────────────────────────
+# Config paths
+DATA_DIR = Path("/kaggle/input/flickr30k-images/flickr30k_images")
+CAPTION_FILE = DATA_DIR.parent / "captions.txt"
 
 # ────────────────────────────────────────
 # Load model + tokenizer
@@ -25,9 +30,6 @@ preprocess = Compose([
               std=[0.26862954, 0.26130258, 0.27577711])
 ])
 
-# 👇 THÊM dòng này ngay sau load config
-
-
 # ────────────────────────────────────────
 def load_caption_groups(caption_file):
     image_to_captions = defaultdict(list)
@@ -35,7 +37,8 @@ def load_caption_groups(caption_file):
         for line in f:
             try:
                 rel_path, caption = line.strip().split('\t')
-                abs_path = str(DATA_DIR / rel_path)  # 👈 sử dụng đúng base Kaggle path
+                rel_path = rel_path.replace("\\", "/")  # 👈 fix lỗi đường dẫn Windows-style
+                abs_path = str(DATA_DIR / Path(rel_path).name)
                 image_to_captions[abs_path].append(caption)
             except ValueError:
                 print(f"❌ Skipping line: {line.strip()}")
@@ -80,7 +83,7 @@ def extract_features(image_to_captions, device, tokenizer, model, preprocess, ba
             print(f"⚠️ Error encoding images {i}-{i+batch_size}: {e}")
             continue
 
-        # Gather and encode captions
+        # Encode captions
         captions, owners = [], []
         for path in batch_paths:
             for cap in image_to_captions.get(path, []):
@@ -93,6 +96,9 @@ def extract_features(image_to_captions, device, tokenizer, model, preprocess, ba
             text_to_image_map.extend(owners)
         except Exception as e:
             print(f"⚠️ Error encoding captions for batch {i}-{i+batch_size}: {e}")
+
+    if len(image_features) == 0:
+        raise RuntimeError("❌ No image features were extracted. Check if paths are correct.")
 
     return (
         torch.cat(image_features, dim=0),
@@ -115,12 +121,9 @@ def save_features(image_feats, text_feats, image_paths, text_to_image_map, outpu
 
     print(f"✅ Saved features to {output_dir}/")
 
-
-caption_file = DATA_DIR / "captions.txt" 
-
 # ────────────────────────────────────────
 if __name__ == "__main__":
-    image_to_captions = load_caption_groups(caption_file)
+    image_to_captions = load_caption_groups(CAPTION_FILE)
     print(f"🔹 Total unique images: {len(image_to_captions)}")
 
     image_feats, text_feats, image_paths, text_to_image_map = extract_features(
