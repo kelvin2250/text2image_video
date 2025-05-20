@@ -25,6 +25,11 @@ preprocess = Compose([
               std=[0.26862954, 0.26130258, 0.27577711])
 ])
 
+from config import DATA_DIR, CAPTION_FILE  # 👈 dòng này hiện chưa dùng CAPTION_FILE
+
+# 👇 THÊM dòng này ngay sau load config
+caption_file = DATA_DIR / "captions.txt"   # hoặc dùng sẵn CAPTION_FILE nếu config đã có
+
 # ────────────────────────────────────────
 def load_caption_groups(caption_file):
     image_to_captions = defaultdict(list)
