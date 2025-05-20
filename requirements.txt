@@ -1,0 +1,8 @@
+torch
+tqdm
+numpy
+Pillow
+faiss-cpu
+transformers
+ftfy
+regex

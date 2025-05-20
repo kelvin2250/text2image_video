@@ -1,0 +1,10 @@
+# Ignore image dataset
+data/flickr30k_images/
+
+# Ignore large output files
+outputs/*.pt
+outputs/*.index
+outputs/*.npy
+
+
+kaggle_upload/
