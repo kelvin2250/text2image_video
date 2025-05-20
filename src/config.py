@@ -3,7 +3,7 @@ import os
 
 # Detect running on Kaggle
 ON_KAGGLE = Path("/kaggle/input").exists()
-
+ON_KAGGLE = False
 # Base data directory
 if ON_KAGGLE:
     DATASET_DIR = Path("/kaggle/input/flickr30k-images/flickr30k_images")
