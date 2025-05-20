@@ -25,10 +25,8 @@ preprocess = Compose([
               std=[0.26862954, 0.26130258, 0.27577711])
 ])
 
-from config import DATA_DIR, CAPTION_FILE  # 👈 dòng này hiện chưa dùng CAPTION_FILE
-
 # 👇 THÊM dòng này ngay sau load config
-caption_file = DATA_DIR / "captions.txt"   # hoặc dùng sẵn CAPTION_FILE nếu config đã có
+
 
 # ────────────────────────────────────────
 def load_caption_groups(caption_file):
@@ -116,6 +114,9 @@ def save_features(image_feats, text_feats, image_paths, text_to_image_map, outpu
         json.dump(text_to_image_map, f, indent=2, ensure_ascii=False)
 
     print(f"✅ Saved features to {output_dir}/")
+
+
+caption_file = DATA_DIR / "captions.txt" 
 
 # ────────────────────────────────────────
 if __name__ == "__main__":
