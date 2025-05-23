@@ -11,7 +11,7 @@ from config import DATA_DIR, OUTPUT_DIR
 # ────────────────────────────────────────
 # Paths (auto for local/Kaggle)
 OUTPUT_DIR = Path(OUTPUT_DIR)
-INDEX_PATH = OUTPUT_DIR / "image.index"
+INDEX_PATH = OUTPUT_DIR / "faiss.index"
 IMAGE_LIST_PATH = OUTPUT_DIR / "image_paths.txt"
 
 # ────────────────────────────────────────
@@ -24,18 +24,13 @@ print(f"✅ Loaded CLIP model on {device}")
 
 # ────────────────────────────────────────
 # 2. Load FAISS index & image paths
-if not INDEX_PATH.exists():
-    raise FileNotFoundError(f"❌ FAISS index not found: {INDEX_PATH}")
 index = faiss.read_index(str(INDEX_PATH))
 
-if not IMAGE_LIST_PATH.exists():
-    raise FileNotFoundError(f"❌ Image paths file not found: {IMAGE_LIST_PATH}")
 with open(IMAGE_LIST_PATH, "r", encoding="utf-8") as f:
     image_paths = [line.strip() for line in f]
 
 print(f"📁 Loaded {len(image_paths)} image paths")
 
-# ────────────────────────────────────────
 # 3. Encode text query
 def encode_query(text):
     inputs = processor(text=[text], return_tensors="pt", padding=True, truncation=True).to(device)
@@ -52,9 +47,6 @@ def search_images(query, top_k=5):
     results = []
     for idx in I[0]:
         path = image_paths[idx]
-        if not Path(path).exists():
-            print(f"⚠️ Warning: File not found: {path}")
-            continue
         results.append(path)
     return results
 
@@ -67,9 +59,6 @@ def show_images(paths, query):
             imgs.append(Image.open(p))
         except Exception as e:
             print(f"❌ Could not open {p}: {e}")
-    if not imgs:
-        print("❌ No images to display.")
-        return
     plt.figure(figsize=(15, 5))
     for i, img in enumerate(imgs):
         plt.subplot(1, len(imgs), i+1)
